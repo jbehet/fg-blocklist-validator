@@ -10,7 +10,7 @@ import schedule
 DEBUG: bool = False
 RUN_SCRIPT_INTERVAL_HOURS: int = 2
 THRESHOLD_GROUP_IPS_INTO_SUBNET: int = 10
-REPO_PATH: str = "E:\\GIT\\Python\\fg_internal_blocklist-testing"
+REPO_PATH: str = "E:\\GIT\\Python\\fg_internal_blocklist"
 INPUT_FILES_TO_PROCESS: list = [
     "add-manual-addresses-here.txt",
     # "add-automated-addresses-here.txt",
