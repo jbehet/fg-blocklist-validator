@@ -10,10 +10,10 @@ import schedule
 DEBUG: bool = False
 RUN_SCRIPT_INTERVAL_HOURS: int = 2
 THRESHOLD_GROUP_IPS_INTO_SUBNET: int = 10
-REPO_PATH: str = "E:\\GIT\\Python\\fg_internal_blocklist-testing"
+REPO_PATH: str = "E:\\GIT\\Python\\fg_internal_blocklist"
 INPUT_FILES_TO_PROCESS: list = [
     "add-manual-addresses-here.txt",
-    # "add-automated-addresses-here.txt",
+    "add-automated-addresses-here.txt",
 ]
 
 # Set up logging
@@ -141,14 +141,14 @@ def group_ips_into_subnets(addresses: list) -> list:
     return list(result)
 
 
-def sort_cidr_notation(entries: list) -> list:
+def sort_cidr_notation(entries: dict) -> dict:
     """Sort the subnets in CIDR notation from largest to smallest subnets and then the IPs."""
 
     def sort_key(entry):
         network = ipaddress.ip_network(entry, strict=False)
         return (network.prefixlen, network.network_address)
 
-    sorted_entries = sorted(entries, key=sort_key)
+    sorted_entries = dict(sorted(entries.items(), key=lambda item: sort_key(item[0])))
     logging.info(f"Sorted subnets. {len(sorted_entries)} entries after sorting.")
     return sorted_entries
 
@@ -216,20 +216,18 @@ def process_lists(file_path: str, output_file_path: str) -> bool:
     unique_addresses = remove_duplicates(raw_addresses)
     valid_addresses = validate_ip_addresses(unique_addresses)
     grouped_addresses = group_ips_into_subnets(valid_addresses)
-    sorted_addresses = sort_cidr_notation(grouped_addresses)
 
     existing_entries = load_existing_output_file(output_file_path)
-    looked_up_addresses = fetch_whois_info(sorted_addresses, existing_entries)
+    looked_up_addresses = fetch_whois_info(grouped_addresses, existing_entries)
 
     # Remove entries that are no longer present in the input file
-    current_entries = set(sorted_addresses)
+    current_entries = set(grouped_addresses)
     removed_entries = set(existing_entries) - current_entries
     for entry in removed_entries:
         del existing_entries[entry]
 
-    return write_entries_to_file(
-        {**existing_entries, **looked_up_addresses}, output_file_path
-    )
+    sorted_entries = sort_cidr_notation({**existing_entries, **looked_up_addresses})
+    return write_entries_to_file(sorted_entries, output_file_path)
 
 
 def commit_and_push(repo: Repo) -> None:
