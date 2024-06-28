@@ -93,16 +93,15 @@ def remove_duplicates(addresses: list) -> list:
 
 def validate_ip_addresses(addresses: list) -> list:
     """Validate IP addresses and filter out invalid ones."""
-    valid_ips, invalid_ips = [], []
+    valid_ips = []
     for ip in addresses:
         try:
             ipaddress.ip_address(ip.split("/")[0])
             valid_ips.append(ip)
         except ValueError:
-            invalid_ips.append(ip)
             logging.warning(f"ERROR: {ip} is not a valid IP address!")
     logging.info(
-        f"Validated addresses. {len(valid_ips)} valid, {len(invalid_ips)} invalid."
+        f"Validated addresses. {len(valid_ips)} valid, {int(len(addresses) - len(valid_ips))} invalid."
     )
     return valid_ips
 
