@@ -6,15 +6,21 @@ from collections import defaultdict
 from git import Repo
 import requests
 import schedule
+from typing import List, Dict, Tuple
 
 DEBUG: bool = False
 RUN_SCRIPT_INTERVAL_HOURS: int = 2
 THRESHOLD_GROUP_IPS_INTO_SUBNET: int = 10
 REPO_PATH: str = "E:\\GIT\\Python\\fg_internal_blocklist"
-INPUT_FILES_TO_PROCESS: list = [
+INPUT_FILES_TO_PROCESS: List[str] = [
     "add-manual-addresses-here.txt",
     "add-automated-addresses-here.txt",
 ]
+
+MAX_ENTRIES: int = 131072
+MAX_SIZE_BYTES: int = 10485760
+MAX_COMMENT_LEN: int = 63
+WHOIS_URL: str = "http://ipwho.is/{ip}?fields=country,region,connection.isp"
 
 # Set up logging
 logging.basicConfig(
@@ -26,7 +32,6 @@ logging.basicConfig(
     ],
 )
 
-
 def initialize_repo() -> Repo:
     """Initialize and return a git repository object."""
     try:
@@ -34,26 +39,30 @@ def initialize_repo() -> Repo:
         logging.info(f"Initialized Git repository at {REPO_PATH}")
         return repo
     except Exception as e:
-        logging.error(f"Error initializing Git repository: {e}")
+        logging.error(f"Error initializing Git repository: {e}", exc_info=True)
         exit(1)
-
 
 def check_for_remote_changes(repo: Repo) -> bool:
     """Check if there are remote changes in the repository."""
-    origin = repo.remotes.origin
-    origin.fetch()
-    local_commit = repo.commit("refs/heads/main")
-    remote_commit = repo.commit("refs/remotes/origin/main")
-    return local_commit != remote_commit
-
+    try:
+        origin = repo.remotes.origin
+        origin.fetch()
+        local_commit = repo.commit("refs/heads/main")
+        remote_commit = repo.commit("refs/remotes/origin/main")
+        return local_commit != remote_commit
+    except Exception as e:
+        logging.error(f"Error checking for remote changes: {e}", exc_info=True)
+        return False
 
 def pull_latest_changes(repo: Repo) -> None:
     """Pull the latest changes from the remote repository."""
-    repo.remotes.origin.pull()
-    logging.info("Pulled the latest changes from the remote repository.")
+    try:
+        repo.remotes.origin.pull()
+        logging.info("Pulled the latest changes from the remote repository.")
+    except Exception as e:
+        logging.error(f"Error pulling latest changes: {e}", exc_info=True)
 
-
-def load_input_file(file_path: str) -> list:
+def load_input_file(file_path: str) -> List[str]:
     """Load and return the list of addresses from the input file."""
     try:
         with open(file_path, "r") as file:
@@ -64,8 +73,7 @@ def load_input_file(file_path: str) -> list:
         logging.error(f"Input file {file_path} not found.")
         exit(1)
 
-
-def load_existing_output_file(file_path: str) -> dict:
+def load_existing_output_file(file_path: str) -> Dict[str, str]:
     """Load the existing output file and return its entries."""
     entries = {}
     if os.path.exists(file_path):
@@ -81,8 +89,7 @@ def load_existing_output_file(file_path: str) -> dict:
         logging.info(f"No existing output file found at {file_path}")
     return entries
 
-
-def remove_duplicates(addresses: list) -> list:
+def remove_duplicates(addresses: List[str]) -> List[str]:
     """Remove duplicate addresses and return a sorted list."""
     unique_addresses = sorted(set(addresses))
     logging.info(
@@ -90,8 +97,7 @@ def remove_duplicates(addresses: list) -> list:
     )
     return unique_addresses
 
-
-def validate_ip_addresses(addresses: list) -> list:
+def validate_ip_addresses(addresses: List[str]) -> List[str]:
     """Validate IP addresses and filter out invalid ones."""
     valid_ips = []
     for ip in addresses:
@@ -105,8 +111,7 @@ def validate_ip_addresses(addresses: list) -> list:
     )
     return valid_ips
 
-
-def group_ips_into_subnets(addresses: list) -> list:
+def group_ips_into_subnets(addresses: List[str]) -> List[str]:
     """Group individual IP addresses into subnets if they exceed a threshold."""
     ip_dict = defaultdict(list)
     existing_subnets, individual_ips = set(), set()
@@ -139,11 +144,10 @@ def group_ips_into_subnets(addresses: list) -> list:
     logging.info(f"Grouped into subnets. {len(result)} entries after grouping.")
     return list(result)
 
-
-def sort_cidr_notation(entries: dict) -> dict:
+def sort_cidr_notation(entries: Dict[str, str]) -> Dict[str, str]:
     """Sort the subnets in CIDR notation from largest to smallest subnets and then the IPs."""
 
-    def sort_key(entry):
+    def sort_key(entry: str) -> Tuple[int, ipaddress.IPv4Address]:
         network = ipaddress.ip_network(entry, strict=False)
         return (network.prefixlen, network.network_address)
 
@@ -151,37 +155,27 @@ def sort_cidr_notation(entries: dict) -> dict:
     logging.info(f"Sorted subnets. {len(sorted_entries)} entries after sorting.")
     return sorted_entries
 
-
-def fetch_whois_info(entries: list, existing_entries: dict) -> dict:
+def fetch_whois_info(entries: List[str], existing_entries: Dict[str, str]) -> Dict[str, str]:
     """Check Whois information for each entry that is new or changed."""
     whois_info = {}
-    logging.info(
-        "Start fetching WhoIs information for new or changed entries. This could take a while..."
-    )
+    logging.info("Start fetching WhoIs information for new or changed entries. This could take a while...")
     for entry in entries:
         if entry not in existing_entries:
             try:
-                response = requests.get(
-                    f"http://ipwho.is/{entry.split('/')[0]}?fields=country,region,connection.isp"
-                )
+                response = requests.get(WHOIS_URL.format(ip=entry.split('/')[0]))
                 response_json = response.json()
                 comment = f"{response_json.get('country')} | {response_json.get('region')} | {response_json.get('connection', {}).get('isp')}"
                 whois_info[entry] = comment
             except Exception as e:
-                logging.error(f"Error processing {entry}: {e}")
+                logging.error(f"Error processing {entry}: {e}", exc_info=True)
         else:
             whois_info[entry] = existing_entries[entry]
     logging.info("WhoIs information processed.")
     return whois_info
 
-
-def write_entries_to_file(entries: dict, file_path: str) -> bool:
+def write_entries_to_file(entries: Dict[str, str], file_path: str) -> bool:
     """Write the processed addresses to the output file and return success."""
-    max_entries = 131072
-    max_size_bytes = 10485760
-    max_comment_len = 63
-
-    if len(entries) >= max_entries:
+    if len(entries) >= MAX_ENTRIES:
         logging.error("The number of entries exceeds the limit of 131072")
         return False
 
@@ -190,24 +184,23 @@ def write_entries_to_file(entries: dict, file_path: str) -> bool:
             for entry, comment in entries.items():
                 if comment:
                     comment = (
-                        f"# {comment[:max_comment_len-5]}...\n"
-                        if len(comment) > max_comment_len - 2
+                        f"# {comment[:MAX_COMMENT_LEN-5]}...\n"
+                        if len(comment) > MAX_COMMENT_LEN - 2
                         else f"# {comment}\n"
                     )
                 file.write(f"{entry} {comment}" if comment else f"{entry}\n")
         file_size = os.path.getsize(file_path)
-        if file_size > max_size_bytes:
+        if file_size > MAX_SIZE_BYTES:
             logging.error(
-                f"The file size exceeds the limit of {int(max_size_bytes / 1024 / 1024)}MB"
+                f"The file size exceeds the limit of {int(MAX_SIZE_BYTES / 1024 / 1024)}MB"
             )
             return False
         else:
             logging.info(f"Output written to {file_path} ({file_size} bytes)")
             return True
     except IOError as e:
-        logging.error(f"Error writing to output file: {e}")
+        logging.error(f"Error writing to output file: {e}", exc_info=True)
         return False
-
 
 def process_lists(file_path: str, output_file_path: str) -> bool:
     """Process the input file: load, deduplicate, validate, group, and write to output."""
@@ -228,17 +221,18 @@ def process_lists(file_path: str, output_file_path: str) -> bool:
     sorted_entries = sort_cidr_notation({**existing_entries, **looked_up_addresses})
     return write_entries_to_file(sorted_entries, output_file_path)
 
-
 def commit_and_push(repo: Repo) -> None:
     """Commit and push changes to the remote repository."""
-    repo.git.add(update=True)
-    if repo.is_dirty(untracked_files=True):
-        repo.index.commit("Update validated blocklists")
-        repo.remotes.origin.push()
-        logging.info("Changes committed and pushed to the remote repository.")
-    else:
-        logging.info("No changes to commit.")
-
+    try:
+        repo.git.add(update=True)
+        if repo.is_dirty(untracked_files=True):
+            repo.index.commit("Update validated blocklists")
+            repo.remotes.origin.push()
+            logging.info("Changes committed and pushed to the remote repository.")
+        else:
+            logging.info("No changes to commit.")
+    except Exception as e:
+        logging.error(f"Error committing and pushing changes: {e}", exc_info=True)
 
 def main() -> None:
     """Main function to process the input files."""
@@ -246,6 +240,7 @@ def main() -> None:
     if check_for_remote_changes(repo) or DEBUG:
         pull_latest_changes(repo)
 
+        processed = False
         for file_name in INPUT_FILES_TO_PROCESS:
             file_path = os.path.join(REPO_PATH, file_name)
             output_file_path = os.path.join(
@@ -262,22 +257,17 @@ def main() -> None:
         else:
             logging.error("Error during output file validation, not pushing to git.")
     else:
-        logging.info(
-            "No remote changes detected and not in debug mode. Skipping processing."
-        )
-
+        logging.info("No remote changes detected and not in debug mode. Skipping processing.")
 
 def schedule_task() -> None:
     """Schedule the main function to run every n hours."""
     main()
-
     schedule.every(RUN_SCRIPT_INTERVAL_HOURS).hours.do(main)
     logging.info(f"Scheduled task to run again in {RUN_SCRIPT_INTERVAL_HOURS} hours.")
 
     while True:
         schedule.run_pending()
         time.sleep(1)
-
 
 if __name__ == "__main__":
     schedule_task()
