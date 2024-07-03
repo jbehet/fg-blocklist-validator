@@ -24,7 +24,6 @@ MAX_ENTRIES: int = 131072
 MAX_SIZE_BYTES: int = 10485760
 MAX_COMMENT_LEN: int = 63
 
-
 # Set up logging
 logging.basicConfig(
     level=logging.DEBUG if DEBUG else logging.INFO,
