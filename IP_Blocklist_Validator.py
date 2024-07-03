@@ -8,19 +8,22 @@ import requests
 import schedule
 from typing import List, Dict, Tuple
 
+# Script settings
 DEBUG: bool = False
 RUN_SCRIPT_INTERVAL_HOURS: int = 2
 THRESHOLD_GROUP_IPS_INTO_SUBNET: int = 10
 REPO_PATH: str = "E:\\GIT\\Python\\fg_internal_blocklist"
+WHOIS_URL: str = "http://ipwho.is/{ip}?fields=country,region,connection.isp"
 INPUT_FILES_TO_PROCESS: List[str] = [
     "add-manual-addresses-here.txt",
     "add-automated-addresses-here.txt",
 ]
 
+# FortiGate restrictions
 MAX_ENTRIES: int = 131072
 MAX_SIZE_BYTES: int = 10485760
 MAX_COMMENT_LEN: int = 63
-WHOIS_URL: str = "http://ipwho.is/{ip}?fields=country,region,connection.isp"
+
 
 # Set up logging
 logging.basicConfig(
