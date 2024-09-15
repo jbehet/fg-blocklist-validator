@@ -13,16 +13,28 @@ CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def load_config() -> Dict[str, str]:
+    """
+    Loads the configuration settings from the JSON config file.
+
+    Returns:
+        Dict[str, str]: Configuration data in a dictionary format.
+    """
     config_path = os.path.join(CURRENT_DIR, "cfg/config.json")
     try:
         with open(config_path) as file:
             return json.load(file)
     except Exception as e:
-        logging.error(f"[Config] Error loading config file: {e}")
+        logging.error(f"Error loading config file: {e}")
         exit(1)
 
 
 def setup_logging(config: Dict[str, str]) -> None:
+    """
+    Sets up logging configuration based on the provided config.
+
+    Args:
+        config (Dict[str, str]): Configuration settings for logging.
+    """
     logging_level = logging.DEBUG if config["debug"] else logging.INFO
     log_file_path = os.path.join(CURRENT_DIR, "log/script.log")
 
@@ -37,6 +49,15 @@ def setup_logging(config: Dict[str, str]) -> None:
 
 
 def initialize_repo(repo_path: str) -> Repo:
+    """
+    Initializes the Git repository.
+
+    Args:
+        repo_path (str): Path to the Git repository.
+
+    Returns:
+        Repo: Git repository object.
+    """
     try:
         return Repo(repo_path)
     except Exception as e:
@@ -45,6 +66,15 @@ def initialize_repo(repo_path: str) -> Repo:
 
 
 def check_for_remote_changes(repo: Repo) -> bool:
+    """
+    Checks if there are any changes in the remote Git repository compared to the local repository.
+
+    Args:
+        repo (Repo): The local Git repository object.
+
+    Returns:
+        bool: True if changes are detected in the remote repository, False otherwise.
+    """
     try:
         origin = repo.remotes.origin
         origin.fetch()
@@ -57,6 +87,12 @@ def check_for_remote_changes(repo: Repo) -> bool:
 
 
 def pull_latest_changes(repo: Repo) -> None:
+    """
+    Pulls the latest changes from the remote Git repository.
+
+    Args:
+        repo (Repo): The local Git repository object.
+    """
     try:
         repo.remotes.origin.pull()
         logging.info("Pulled the latest changes from the remote repository.")
@@ -65,6 +101,12 @@ def pull_latest_changes(repo: Repo) -> None:
 
 
 def commit_and_push_changes(repo: Repo) -> None:
+    """
+    Commits and pushes changes to the remote Git repository.
+
+    Args:
+        repo (Repo): The local Git repository object.
+    """
     try:
         repo.git.add(update=True)
         if repo.is_dirty(untracked_files=True):
@@ -77,34 +119,61 @@ def commit_and_push_changes(repo: Repo) -> None:
         logging.error(f"Error committing and pushing changes: {e}")
 
 
-def load_input_file_entries(file_path: str) -> List[str]:
+def load_input_file_entries(input_file_path: str) -> List[str]:
+    """
+    Loads entries from an input file.
+
+    Args:
+        input_file_path (str): Path to the input file.
+
+    Returns:
+        List[str]: List of entries (IP addresses) from the file.
+    """
     try:
-        with open(file_path, "r") as file:
+        with open(input_file_path, "r") as file:
             lines = [line.strip() for line in file]
-            logging.info(f"Loaded {len(lines)} lines from {file_path}")
+            logging.info(f"Loaded {len(lines)} lines from {input_file_path}")
             return lines
     except FileNotFoundError:
-        logging.error(f"File {file_path} not found.")
+        logging.error(f"File {input_file_path} not found.")
         exit(1)
 
 
-def load_existing_output_file_entries(file_path: str) -> Dict[str, str]:
+def load_existing_output_file_entries(output_file_path: str) -> Dict[str, str]:
+    """
+    Loads existing entries from an output file.
+
+    Args:
+        output_file_path (str): Path to the output file.
+
+    Returns:
+        Dict[str, str]: Dictionary of existing entries and their comments.
+    """
     entries = {}
-    if os.path.exists(file_path):
-        with open(file_path, "r", encoding="utf-8") as file:
+    if os.path.exists(output_file_path):
+        with open(output_file_path, "r", encoding="utf-8") as file:
             for line in file:
                 if line.strip() and not line.startswith("#"):
                     parts = line.split(" ", 1)
                     entry = parts[0].strip()
                     comment = parts[1].strip("# ").strip() if len(parts) > 1 else ""
                     entries[entry] = comment
-        logging.info(f"Loaded {len(entries)} entries from {file_path}")
+        logging.info(f"Loaded {len(entries)} entries from {output_file_path}")
     else:
-        logging.info(f"No existing output file found at {file_path}")
+        logging.info(f"No existing output file found at {output_file_path}")
     return entries
 
 
 def remove_duplicates(addresses: List[str]) -> List[str]:
+    """
+    Removes duplicate IP addresses from the list.
+
+    Args:
+        addresses (List[str]): List of IP addresses.
+
+    Returns:
+        List[str]: List of unique IP addresses.
+    """
     unique_addresses = sorted(set(addresses))
     logging.info(
         f"Removed duplicates. {len(addresses)} -> {len(unique_addresses)} unique addresses."
@@ -113,13 +182,22 @@ def remove_duplicates(addresses: List[str]) -> List[str]:
 
 
 def validate_ip_addresses(addresses: List[str]) -> List[str]:
+    """
+    Validates the given list of IP addresses.
+
+    Args:
+        addresses (List[str]): List of IP addresses.
+
+    Returns:
+        List[str]: List of valid IP addresses.
+    """
     valid_ips = []
     for ip in addresses:
         try:
             ipaddress.ip_address(ip.split("/")[0])
             valid_ips.append(ip)
         except ValueError:
-            logging.warning(f"ERROR: {ip} is not a valid IP address!")
+            logging.warning(f"{ip} is not a valid IP address!")
     logging.info(
         f"Validated addresses. {len(valid_ips)} valid, {len(addresses) - len(valid_ips)} invalid."
     )
@@ -127,6 +205,16 @@ def validate_ip_addresses(addresses: List[str]) -> List[str]:
 
 
 def group_ips_into_subnets(addresses: List[str], threshold: int) -> List[str]:
+    """
+    Groups individual IP addresses into subnets based on a threshold.
+
+    Args:
+        addresses (List[str]): List of IP addresses or subnets.
+        threshold (int): Minimum number of IPs required to group into a /24 subnet.
+
+    Returns:
+        List[str]: List of grouped subnets.
+    """
     ip_dict = defaultdict(list)
     existing_subnets, individual_ips = set(), set()
 
@@ -160,6 +248,16 @@ def group_ips_into_subnets(addresses: List[str], threshold: int) -> List[str]:
 
 
 def sort_entries_by_cidr(entries: Dict[str, str]) -> Dict[str, str]:
+    """
+    Sorts entries by CIDR prefix length and IP address.
+
+    Args:
+        entries (Dict[str, str]): Dictionary of IP addresses or subnets and their comments.
+
+    Returns:
+        Dict[str, str]: Sorted dictionary of entries.
+    """
+
     def sort_key(entry: str) -> Tuple[int, ipaddress.IPv4Address]:
         network = ipaddress.ip_network(entry, strict=False)
         return (network.prefixlen, network.network_address)
@@ -172,6 +270,16 @@ def sort_entries_by_cidr(entries: Dict[str, str]) -> Dict[str, str]:
 def fetch_whois_info(
     entries: List[str], existing_entries: Dict[str, str]
 ) -> Dict[str, str]:
+    """
+    Fetches WhoIs information for a list of IP addresses or subnets.
+
+    Args:
+        entries (List[str]): List of IP addresses or subnets.
+        existing_entries (Dict[str, str]): Dictionary of already fetched WhoIs data.
+
+    Returns:
+        Dict[str, str]: Dictionary of entries with their associated WhoIs comments.
+    """
     whois_info = {}
     logging.info(
         "Start fetching WhoIs information for new or changed entries. This could take a while..."
@@ -196,6 +304,17 @@ def fetch_whois_info(
 def write_to_output_file(
     entries: Dict[str, str], file_path: str, config: Dict[str, str]
 ) -> bool:
+    """
+    Writes processed entries to the output file.
+
+    Args:
+        entries (Dict[str, str]): Dictionary of IP addresses or subnets and their comments.
+        file_path (str): Path to the output file.
+        config (Dict[str, str]): Configuration settings for output.
+
+    Returns:
+        bool: True if the output file was successfully written, False otherwise.
+    """
     max_entries = config["fg_max_entries"]
     max_comment_length = int(config["fg_max_comment_length"])
     max_file_size = int(config["fg_max_size_bytes"])
@@ -228,9 +347,22 @@ def write_to_output_file(
 
 
 def process_lists(
-    file_path: str, output_file_path: str, config: Dict[str, str]
+    input_file_path: str, output_file_path: str, config: Dict[str, str]
 ) -> Tuple[bool, int, int]:
-    raw_addresses = load_input_file_entries(file_path)
+    """
+    Processes input lists, validates IP addresses, groups them into subnets,
+    fetches WhoIs information, and writes the final output.
+
+    Args:
+        input_file_path (str): Path to the input file.
+        output_file_path (str): Path to the output file.
+        config (Dict[str, str]): Configuration settings for processing.
+
+    Returns:
+        Tuple[bool, int, int]: A tuple indicating success status, number of added entries,
+                               and number of removed entries.
+    """
+    raw_addresses = load_input_file_entries(input_file_path)
     unique_addresses = remove_duplicates(raw_addresses)
     valid_addresses = validate_ip_addresses(unique_addresses)
     grouped_addresses = group_ips_into_subnets(
@@ -254,6 +386,10 @@ def process_lists(
 
 
 def main() -> None:
+    """
+    Main function to load configuration, check for remote changes, process files,
+    and commit changes if applicable.
+    """
     config = load_config()
     setup_logging(config)
 
@@ -266,14 +402,14 @@ def main() -> None:
         total_additions, total_deletions = 0, 0
 
         for file_name in config["input_files_to_process"]:
-            file_path = os.path.join(config["repo_path"], file_name)
+            input_file_path = os.path.join(config["repo_path"], file_name)
             output_file_path = os.path.join(
                 config["repo_path"],
                 "output",
                 f"blocklist-industrial{'-manual' if 'manual' in file_name else ''}.txt",
             )
             processed, additions, deletions = process_lists(
-                file_path, output_file_path, config
+                input_file_path, output_file_path, config
             )
             total_additions += additions
             total_deletions += deletions
@@ -295,6 +431,11 @@ def main() -> None:
 
 
 def schedule_task() -> None:
+    """
+    Schedules the script to run at regular intervals based on the configuration.
+
+    The task runs periodically using the schedule module.
+    """
     config = load_config()
     main()
     schedule.every(config["run_script_interval_hours"]).hours.do(main)

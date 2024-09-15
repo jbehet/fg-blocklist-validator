@@ -22,9 +22,10 @@ Logging is implemented to track the script's operations, and debug mode is avail
 
 ## Usage
 1. **Clone the Repository**: Clone the repository to your local machine.
-2. **Set Parameters**: Modify the parameters in the script as needed, such as `REPO_PATH`, `INPUT_FILES_TO_PROCESS`, and `RUN_SCRIPT_INTERVAL_HOURS`.
+2. **Set Parameters**: Modify the parameters in the [`cfg/config.json`](cfg/config.json) as needed,
+   such as `repo_path`, `input_files_to_process`, and `run_script_interval_hours`.
 3. **Run the Script**: Execute the script to start processing the blocklists and scheduling the task.
-4. **Monitor Logs**: Check the log file (`blocklist_processor.log`) for detailed logs of the script's operations.
+4. **Monitor Logs**: Check the log file [`log/script.log`](log/script.log) for detailed logs of the script's operations.
 
 ## Requirements
 - Python 3.x
@@ -34,7 +35,9 @@ Logging is implemented to track the script's operations, and debug mode is avail
 
 Install the necessary packages using:
 ```bash
-pip install gitpython requests schedule
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 ## Disclaimer
