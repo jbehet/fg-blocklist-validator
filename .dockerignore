@@ -1,0 +1,8 @@
+**/.venv
+**/.vscode
+**/.git
+**/.gitignore
+**/.gitattributes
+**/.log
+Dockerfile
+README.md
