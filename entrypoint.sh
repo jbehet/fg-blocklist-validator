@@ -12,6 +12,7 @@ if [ -d "$CLONE_DIR/.git" ]; then
 
   cd "$CLONE_DIR"
   EXISTING_URL=$(git config --get remote.origin.url)
+  cd /app
 
   if [ "$EXISTING_URL" == "$CLONE_URL" ]; then
     echo "Remote already exists and matches expected repository."
@@ -23,10 +24,7 @@ if [ -d "$CLONE_DIR/.git" ]; then
 else
   echo "Cloning repo from $GIT_REPO_URL..."
   git clone --branch "$GIT_BRANCH" "$CLONE_URL" "$CLONE_DIR"
-  cd "$CLONE_DIR"
 fi
-
-cd /app
 
 echo "Starting application..."
 python /app/main.py
